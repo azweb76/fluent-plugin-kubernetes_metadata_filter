@@ -41,6 +41,7 @@ module Fluent
     config_param :watch, :bool, default: true
     config_param :apiVersion, :string, default: 'v1'
     config_param :client_cert, :string, default: nil
+    config_param :default_tag, :string, default: 'clear'
     config_param :client_key, :string, default: nil
     config_param :ca_file, :string, default: nil
     config_param :verify_ssl, :bool, default: true
@@ -244,7 +245,7 @@ module Fluent
         self.class.class_eval { alias_method :filter_stream, :filter_stream_from_files }
       end
 
-      @annotations_regexps = []
+      @annotations_regexps = [Regexp.compile('^kubernetes\.io\/fluentd-tag$')]
       @annotation_match.each do |regexp|
         begin
           @annotations_regexps << Regexp.compile(regexp)
@@ -290,11 +291,14 @@ module Fluent
       batch_miss_cache = {}
       if match_data
         container_id = match_data['docker_id']
+        kube_metadata = get_metadata_for_record(match_data, container_id, create_time_from_record(es.first[1]), batch_miss_cache)
+        kube_annotations = kube_metadata['annotations'].nil ? {} : kube_metadata['annotations']
         metadata = {
           'docker' => {
             'container_id' => container_id
           },
-          'kubernetes' => get_metadata_for_record(match_data, container_id, create_time_from_record(es.first[1]), batch_miss_cache)
+          'kubernetes' => kube_metadata,
+          'kubernetes_tag' => kube_annotations['kubernetes.io/fluentd-tag'].nil ? default_tag : kube_annotations['kubernetes.io/fluentd-tag']
         }
       end
 
@@ -318,11 +322,14 @@ module Fluent
         if record.has_key?('CONTAINER_NAME') && record.has_key?('CONTAINER_ID_FULL')
           metadata = record['CONTAINER_NAME'].match(@container_name_to_kubernetes_regexp_compiled) do |match_data|
            container_id = record['CONTAINER_ID_FULL']
+           kube_metadata = get_metadata_for_record(match_data, container_id, create_time_from_record(record), batch_miss_cache)
+           kube_annotations = kube_metadata['annotations'].nil ? {} : kube_metadata['annotations']
             metadata = {
               'docker' => {
                 'container_id' => container_id
               },
-              'kubernetes' => get_metadata_for_record(match_data, container_id, create_time_from_record(record), batch_miss_cache)
+              'kubernetes' => kube_metadata,
+              'kubernetes_tag' => kube_annotations['kubernetes.io/fluentd-tag'].nil ? default_tag : kube_annotations['kubernetes.io/fluentd-tag']
             }
 
             metadata
