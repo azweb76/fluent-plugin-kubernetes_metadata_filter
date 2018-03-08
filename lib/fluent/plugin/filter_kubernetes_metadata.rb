@@ -292,13 +292,13 @@ module Fluent
       if match_data
         container_id = match_data['docker_id']
         kube_metadata = get_metadata_for_record(match_data, container_id, create_time_from_record(es.first[1]), batch_miss_cache)
-        kube_annotations = kube_metadata['annotations'].nil ? {} : kube_metadata['annotations']
+        kube_annotations = kube_metadata.has_key?('annotations') ? {} : kube_metadata['annotations']
         metadata = {
           'docker' => {
             'container_id' => container_id
           },
           'kubernetes' => kube_metadata,
-          'kubernetes_tag' => kube_annotations['kubernetes.io/fluentd-tag'].nil ? default_tag : kube_annotations['kubernetes.io/fluentd-tag']
+          'kubernetes_tag' => kube_annotations.has_key?('kubernetes_io/fluentd-tag') ? kube_annotations['kubernetes_io/fluentd-tag'] : default_tag
         }
       end
 
@@ -323,13 +323,13 @@ module Fluent
           metadata = record['CONTAINER_NAME'].match(@container_name_to_kubernetes_regexp_compiled) do |match_data|
            container_id = record['CONTAINER_ID_FULL']
            kube_metadata = get_metadata_for_record(match_data, container_id, create_time_from_record(record), batch_miss_cache)
-           kube_annotations = kube_metadata['annotations'].nil ? {} : kube_metadata['annotations']
+           kube_annotations = kube_metadata.has_key?('annotations') ? kube_metadata['annotations'] : {}
             metadata = {
               'docker' => {
                 'container_id' => container_id
               },
               'kubernetes' => kube_metadata,
-              'kubernetes_tag' => kube_annotations['kubernetes.io/fluentd-tag'].nil ? default_tag : kube_annotations['kubernetes.io/fluentd-tag']
+              'kubernetes_tag' => kube_annotations.has_key?('kubernetes_io/fluentd-tag') ? kube_annotations['kubernetes_io/fluentd-tag'] : default_tag
             }
 
             metadata
